@@ -8,6 +8,9 @@
   to   = "/index.html"
   status = 200
 
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core" 
+
 # Netlify Identity aktivieren
 [template.environment]
   WEATHER_API_KEY = "DEIN_WEATHERAPI_KEY_HIER"
