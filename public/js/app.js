@@ -72,8 +72,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 // ── CLOUD TASK SYNC (Netlify Function) ─
 async function getAuthHeader() {
-  const token = currentUser?.token?.access_token;
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
+  // Token immer frisch vom Identity-Widget holen
+  return new Promise((resolve) => {
+    netlifyIdentity.currentUser()?.jwt().then(token => {
+      resolve(token ? { 'Authorization': `Bearer ${token}` } : {});
+    }).catch(() => resolve({}));
+  });
 }
 
 async function loadTasksFromCloud() {

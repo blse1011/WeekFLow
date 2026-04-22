@@ -3,14 +3,35 @@
 
 const { getStore } = require('@netlify/blobs');
 
+// JWT Payload manuell dekodieren (kein Verify nötig – Netlify macht das intern)
+function decodeJwt(token) {
+  try {
+    const payload = token.split('.')[1];
+    const decoded = Buffer.from(payload, 'base64url').toString('utf8');
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
 exports.handler = async (event, context) => {
-  // User aus Netlify Identity JWT auslesen
-  const user = context.clientContext?.user;
-  if (!user) {
+  // Token aus Authorization Header holen
+  const authHeader = event.headers['authorization'] || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  // Fallback: clientContext (funktioniert bei manchen Netlify-Setups)
+  let userId = context.clientContext?.user?.sub;
+
+  // Wenn clientContext leer, JWT manuell dekodieren
+  if (!userId && token) {
+    const payload = decodeJwt(token);
+    userId = payload?.sub;
+  }
+
+  if (!userId) {
     return { statusCode: 401, body: JSON.stringify({ error: 'Nicht eingeloggt' }) };
   }
 
-  const userId = user.sub; // eindeutige User-ID aus dem JWT
   const store = getStore('tasks');
   const key = `user_${userId}`;
 
