@@ -1,49 +1,46 @@
 // netlify/functions/tasks.js
-// Cloud-Sync für Tasks via Netlify Blobs (pro User, via JWT-Token)
+// Cloud-Sync via Netlify Blobs (eingebaut, keine npm dependency nötig)
 
-const { getStore } = require('@netlify/blobs');
-
-// JWT Payload manuell dekodieren (kein Verify nötig – Netlify macht das intern)
 function decodeJwt(token) {
   try {
     const payload = token.split('.')[1];
     const decoded = Buffer.from(payload, 'base64url').toString('utf8');
     return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 exports.handler = async (event, context) => {
-  // Token aus Authorization Header holen
-  const authHeader = event.headers['authorization'] || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-
-  // Fallback: clientContext (funktioniert bei manchen Netlify-Setups)
+  // User-ID aus JWT holen
   let userId = context.clientContext?.user?.sub;
-
-  // Wenn clientContext leer, JWT manuell dekodieren
-  if (!userId && token) {
-    const payload = decodeJwt(token);
-    userId = payload?.sub;
+  if (!userId) {
+    const auth = event.headers['authorization'] || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    if (token) userId = decodeJwt(token)?.sub;
   }
 
   if (!userId) {
     return { statusCode: 401, body: JSON.stringify({ error: 'Nicht eingeloggt' }) };
   }
 
-  const store = getStore('tasks');
-  const key = `user_${userId}`;
+  // Netlify Blobs aus der eingebauten Runtime laden (kein npm install nötig)
+  let getStore;
+  try {
+    ({ getStore } = require('@netlify/blobs'));
+  } catch {
+    return { statusCode: 500, body: JSON.stringify({ error: '@netlify/blobs nicht verfügbar' }) };
+  }
+
+  const store = getStore('weekflow-tasks');
+  const key = `tasks-${userId}`;
 
   // GET: Tasks laden
   if (event.httpMethod === 'GET') {
     try {
-      const raw = await store.get(key);
-      const tasks = raw ? JSON.parse(raw) : [];
+      const data = await store.get(key, { type: 'json' });
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tasks),
+        body: JSON.stringify(data || []),
       };
     } catch {
       return { statusCode: 200, body: '[]' };
@@ -54,7 +51,7 @@ exports.handler = async (event, context) => {
   if (event.httpMethod === 'POST') {
     try {
       const tasks = JSON.parse(event.body || '[]');
-      await store.set(key, JSON.stringify(tasks));
+      await store.setJSON(key, tasks);
       return { statusCode: 200, body: JSON.stringify({ ok: true }) };
     } catch (e) {
       return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
