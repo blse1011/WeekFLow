@@ -10,4 +10,4 @@
 
 # Netlify Identity aktivieren
 [template.environment]
-  ODDS_API_KEY = "DEIN_API_KEY_HIER"
+  WEATHER_API_KEY = "DEIN_WEATHERAPI_KEY_HIER"

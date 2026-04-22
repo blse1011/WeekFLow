@@ -7,7 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
-  <!-- Netlify Identity Widget -->
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
@@ -30,7 +29,6 @@
   <!-- ── APP ────────────────────────────────────── -->
   <div id="app" class="app hidden">
 
-    <!-- HEADER -->
     <header class="header">
       <div class="header-inner">
         <div class="header-logo">
@@ -50,64 +48,58 @@
       </div>
     </header>
 
-    <!-- NAV TABS -->
     <nav class="tab-nav">
       <button class="tab-btn active" data-tab="week">📅 Woche</button>
       <button class="tab-btn" data-tab="tasks">✅ Aufgaben</button>
-      <button class="tab-btn" data-tab="bets">🎰 Wetten</button>
+      <button class="tab-btn" data-tab="weather">🌤️ Wetter</button>
     </nav>
 
-    <!-- MAIN CONTENT -->
     <main class="main">
 
-      <!-- ── WEEK VIEW ── -->
+      <!-- WEEK VIEW -->
       <section id="tab-week" class="tab-content active">
         <div class="section-header">
           <h2>Diese Woche</h2>
           <span class="week-label" id="week-label"></span>
         </div>
-        <div class="week-grid" id="week-grid">
-          <!-- JS renders day columns -->
-        </div>
+        <div class="week-grid" id="week-grid"></div>
       </section>
 
-      <!-- ── TASK VIEW ── -->
+      <!-- TASK VIEW -->
       <section id="tab-tasks" class="tab-content">
         <div class="section-header">
           <h2>Alle Aufgaben</h2>
           <button class="btn btn-primary btn-sm" id="open-add-modal">+ Aufgabe</button>
         </div>
-
         <div class="filter-bar">
           <button class="filter-btn active" data-filter="all">Alle</button>
           <button class="filter-btn" data-filter="open">Offen</button>
           <button class="filter-btn" data-filter="done">Erledigt</button>
         </div>
-
         <div id="task-list" class="task-list">
           <div class="empty-state">Noch keine Aufgaben. Leg eine an!</div>
         </div>
       </section>
 
-      <!-- ── BETS VIEW ── -->
-      <section id="tab-bets" class="tab-content">
+      <!-- WEATHER VIEW -->
+      <section id="tab-weather" class="tab-content">
         <div class="section-header">
-          <h2>Aktuelle Sportwetten</h2>
-          <button class="btn btn-ghost btn-sm" id="refresh-bets">↻ Aktualisieren</button>
+          <h2>Wetter</h2>
+          <button class="btn btn-ghost btn-sm" id="refresh-weather">↻ Aktualisieren</button>
         </div>
-        <p class="bets-disclaimer">Nur zur Demo – keine echten Wetten. Daten via The Odds API.</p>
-        <div id="bets-list" class="bets-list">
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <span>Lade Quoten…</span>
-          </div>
+        <div class="weather-location-bar">
+          <input type="text" id="weather-city-input" placeholder="Stadt eingeben… (z.B. Düsseldorf)" />
+          <button class="btn btn-primary btn-sm" id="weather-search-btn">Suchen</button>
+        </div>
+        <div id="weather-content">
+          <div class="empty-state">Gib eine Stadt ein um das Wetter zu sehen.</div>
         </div>
       </section>
 
     </main>
   </div>
 
-  <!-- ── ADD TASK MODAL ── -->
+  <!-- ADD TASK MODAL -->
   <div id="task-modal" class="modal-backdrop hidden">
     <div class="modal">
       <div class="modal-header">

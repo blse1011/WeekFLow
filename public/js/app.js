@@ -1,52 +1,41 @@
 /* ═══════════════════════════════════════
    WeekFlow — app.js
-   Task Manager + Week View + Bets
+   Cloud Task Sync + Weather
 ═══════════════════════════════════════ */
 
-// ── STATE ──────────────────────────────
 let tasks = [];
 let currentUser = null;
-let activeFiler = 'all';
+let activeFilter = 'all';
+let lastWeatherCity = '';
 
-const STORAGE_KEY = 'weekflow_tasks';
-const THEME_KEY   = 'weekflow_theme';
+const THEME_KEY = 'weekflow_theme';
 
 // ── NETLIFY IDENTITY ───────────────────
 const netlifyIdentity = window.netlifyIdentity;
 
 netlifyIdentity.on('init', user => {
-  if (user) {
-    currentUser = user;
-    showApp(user);
-  }
+  if (user) { currentUser = user; showApp(user); }
 });
-
 netlifyIdentity.on('login', user => {
   currentUser = user;
   netlifyIdentity.close();
   showApp(user);
 });
-
 netlifyIdentity.on('logout', () => {
   currentUser = null;
+  tasks = [];
   document.getElementById('app').classList.add('hidden');
   document.getElementById('auth-screen').classList.remove('hidden');
-  tasks = [];
 });
 
-document.getElementById('login-btn').addEventListener('click', () => {
-  netlifyIdentity.open();
-});
+document.getElementById('login-btn').addEventListener('click', () => netlifyIdentity.open());
+document.getElementById('logout-btn').addEventListener('click', () => netlifyIdentity.logout());
 
-document.getElementById('logout-btn').addEventListener('click', () => {
-  netlifyIdentity.logout();
-});
-
-function showApp(user) {
+async function showApp(user) {
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('user-email').textContent = user.email;
-  loadTasks();
+  await loadTasksFromCloud();
   renderWeek();
   renderTasks();
 }
@@ -58,8 +47,7 @@ html.setAttribute('data-theme', savedTheme);
 updateThemeIcon(savedTheme);
 
 document.getElementById('theme-toggle').addEventListener('click', () => {
-  const current = html.getAttribute('data-theme');
-  const next = current === 'light' ? 'dark' : 'light';
+  const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
   html.setAttribute('data-theme', next);
   localStorage.setItem(THEME_KEY, next);
   updateThemeIcon(next);
@@ -78,35 +66,47 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${tab}`).classList.add('active');
-    if (tab === 'bets') loadBets();
+    if (tab === 'weather' && lastWeatherCity) loadWeather(lastWeatherCity);
   });
 });
 
-// ── TASK STORAGE ───────────────────────
-function storageKey() {
-  return currentUser ? `${STORAGE_KEY}_${currentUser.id}` : STORAGE_KEY;
+// ── CLOUD TASK SYNC (Netlify Function) ─
+async function getAuthHeader() {
+  const token = currentUser?.token?.access_token;
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
-function loadTasks() {
+async function loadTasksFromCloud() {
+  const list = document.getElementById('task-list');
+  list.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Lade Aufgaben…</span></div>`;
   try {
-    const raw = localStorage.getItem(storageKey());
-    tasks = raw ? JSON.parse(raw) : [];
-  } catch { tasks = []; }
+    const headers = await getAuthHeader();
+    const res = await fetch('/.netlify/functions/tasks', { headers });
+    if (!res.ok) throw new Error('Load failed');
+    tasks = await res.json();
+  } catch {
+    tasks = [];
+  }
 }
 
-function saveTasks() {
-  localStorage.setItem(storageKey(), JSON.stringify(tasks));
+async function saveTasksToCloud() {
+  try {
+    const headers = { 'Content-Type': 'application/json', ...await getAuthHeader() };
+    await fetch('/.netlify/functions/tasks', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(tasks),
+    });
+  } catch (e) {
+    console.error('Cloud save failed:', e);
+  }
 }
 
 // ── WEEK VIEW ──────────────────────────
-const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
-const DAY_FULL  = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-
 function renderWeek() {
   const grid = document.getElementById('week-grid');
   const today = new Date();
-  // Start on Monday of current week
-  const dayOfWeek = today.getDay(); // 0=Sun
+  const dayOfWeek = today.getDay();
   const monday = new Date(today);
   monday.setDate(today.getDate() - ((dayOfWeek + 6) % 7));
 
@@ -116,13 +116,13 @@ function renderWeek() {
     return d;
   });
 
-  const startStr = monday.toLocaleDateString('de-DE', { day:'2-digit', month:'short' });
+  const startStr = monday.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
   const endDate = new Date(monday); endDate.setDate(monday.getDate() + 6);
-  const endStr = endDate.toLocaleDateString('de-DE', { day:'2-digit', month:'short' });
+  const endStr = endDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
   document.getElementById('week-label').textContent = `${startStr} – ${endStr}`;
 
+  const shorts = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
   grid.innerHTML = '';
-  const shorts = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 
   weekDays.forEach((date, i) => {
     const isToday = date.toDateString() === today.toDateString();
@@ -139,8 +139,7 @@ function renderWeek() {
       <div class="day-tasks">
         ${dayTasks.map(t => `
           <div class="day-task-chip priority-${t.priority}${t.done ? ' done' : ''}"
-               title="${escHtml(t.title)}"
-               data-id="${t.id}">
+               title="${escHtml(t.title)}" data-id="${t.id}">
             ${escHtml(t.title)}
           </div>
         `).join('')}
@@ -157,27 +156,24 @@ function renderWeek() {
 function renderTasks() {
   const list = document.getElementById('task-list');
   let filtered = tasks;
-  if (activeFiler === 'open') filtered = tasks.filter(t => !t.done);
-  if (activeFiler === 'done') filtered = tasks.filter(t => t.done);
+  if (activeFilter === 'open') filtered = tasks.filter(t => !t.done);
+  if (activeFilter === 'done') filtered = tasks.filter(t => t.done);
 
   if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty-state">${activeFiler === 'all' ? 'Noch keine Aufgaben. Leg eine an!' : 'Keine Aufgaben hier.'}</div>`;
+    list.innerHTML = `<div class="empty-state">${activeFilter === 'all' ? 'Noch keine Aufgaben. Leg eine an!' : 'Keine Aufgaben hier.'}</div>`;
     return;
   }
 
-  // Sort: high priority first, then by due date
   filtered = [...filtered].sort((a, b) => {
-    const pOrder = { high: 0, medium: 1, low: 2 };
-    if (pOrder[a.priority] !== pOrder[b.priority]) return pOrder[a.priority] - pOrder[b.priority];
+    const p = { high: 0, medium: 1, low: 2 };
+    if (p[a.priority] !== p[b.priority]) return p[a.priority] - p[b.priority];
     if (a.due && b.due) return a.due.localeCompare(b.due);
     return 0;
   });
 
   list.innerHTML = filtered.map(t => `
     <div class="task-card${t.done ? ' done' : ''}" data-id="${t.id}">
-      <div class="task-checkbox${t.done ? ' checked' : ''}" data-id="${t.id}">
-        ${t.done ? '✓' : ''}
-      </div>
+      <div class="task-checkbox${t.done ? ' checked' : ''}" data-id="${t.id}">${t.done ? '✓' : ''}</div>
       <div class="task-body">
         <div class="task-title-text">${escHtml(t.title)}</div>
         <div class="task-meta">
@@ -188,21 +184,15 @@ function renderTasks() {
         ${t.desc ? `<div style="font-size:.82rem;color:var(--text-muted);margin-top:4px">${escHtml(t.desc)}</div>` : ''}
       </div>
       <div class="task-actions">
-        <button class="icon-btn edit-btn" data-id="${t.id}" title="Bearbeiten">✏️</button>
-        <button class="icon-btn delete-btn" data-id="${t.id}" title="Löschen">🗑️</button>
+        <button class="icon-btn edit-btn" data-id="${t.id}">✏️</button>
+        <button class="icon-btn delete-btn" data-id="${t.id}">🗑️</button>
       </div>
     </div>
   `).join('');
 
-  list.querySelectorAll('.task-checkbox').forEach(cb => {
-    cb.addEventListener('click', () => toggleTask(cb.dataset.id));
-  });
-  list.querySelectorAll('.edit-btn').forEach(btn => {
-    btn.addEventListener('click', () => openEditModal(btn.dataset.id));
-  });
-  list.querySelectorAll('.delete-btn').forEach(btn => {
-    btn.addEventListener('click', () => deleteTask(btn.dataset.id));
-  });
+  list.querySelectorAll('.task-checkbox').forEach(cb => cb.addEventListener('click', () => toggleTask(cb.dataset.id)));
+  list.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', () => openEditModal(btn.dataset.id)));
+  list.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', () => deleteTask(btn.dataset.id)));
 }
 
 // ── FILTER ─────────────────────────────
@@ -210,25 +200,29 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    activeFiler = btn.dataset.filter;
+    activeFilter = btn.dataset.filter;
     renderTasks();
   });
 });
 
 // ── TASK CRUD ──────────────────────────
-function toggleTask(id) {
+async function toggleTask(id) {
   const task = tasks.find(t => t.id === id);
-  if (task) { task.done = !task.done; saveTasks(); renderTasks(); renderWeek(); }
+  if (task) {
+    task.done = !task.done;
+    renderTasks(); renderWeek();
+    await saveTasksToCloud();
+  }
 }
 
-function deleteTask(id) {
+async function deleteTask(id) {
   tasks = tasks.filter(t => t.id !== id);
-  saveTasks(); renderTasks(); renderWeek();
+  renderTasks(); renderWeek();
+  await saveTasksToCloud();
 }
 
 // ── MODAL ──────────────────────────────
 const modal = document.getElementById('task-modal');
-
 document.getElementById('open-add-modal').addEventListener('click', openAddModal);
 document.getElementById('close-modal').addEventListener('click', closeModal);
 document.getElementById('cancel-modal').addEventListener('click', closeModal);
@@ -243,7 +237,7 @@ function openAddModal() {
   document.getElementById('task-day-input').value = '';
   document.getElementById('task-due-input').value = '';
   modal.classList.remove('hidden');
-  document.getElementById('task-title-input').focus();
+  setTimeout(() => document.getElementById('task-title-input').focus(), 100);
 }
 
 function openEditModal(id) {
@@ -257,19 +251,18 @@ function openEditModal(id) {
   document.getElementById('task-day-input').value = task.day || '';
   document.getElementById('task-due-input').value = task.due || '';
   modal.classList.remove('hidden');
-  document.getElementById('task-title-input').focus();
+  setTimeout(() => document.getElementById('task-title-input').focus(), 100);
 }
 
-function closeModal() {
-  modal.classList.add('hidden');
-}
+function closeModal() { modal.classList.add('hidden'); }
 
-document.getElementById('save-task-btn').addEventListener('click', () => {
+document.getElementById('save-task-btn').addEventListener('click', async () => {
   const title = document.getElementById('task-title-input').value.trim();
   if (!title) {
-    document.getElementById('task-title-input').focus();
-    document.getElementById('task-title-input').style.borderColor = 'var(--danger)';
-    setTimeout(() => document.getElementById('task-title-input').style.borderColor = '', 1500);
+    const inp = document.getElementById('task-title-input');
+    inp.style.borderColor = 'var(--danger)';
+    inp.focus();
+    setTimeout(() => inp.style.borderColor = '', 1500);
     return;
   }
   const editId = document.getElementById('task-edit-id').value;
@@ -288,61 +281,88 @@ document.getElementById('save-task-btn').addEventListener('click', () => {
     tasks.push({ id: crypto.randomUUID(), done: false, createdAt: Date.now(), ...taskData });
   }
 
-  saveTasks(); renderTasks(); renderWeek(); closeModal();
+  closeModal();
+  renderTasks(); renderWeek();
+  await saveTasksToCloud();
 });
 
-// ── BETS ───────────────────────────────
-async function loadBets() {
-  const list = document.getElementById('bets-list');
-  list.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Lade Quoten…</span></div>`;
+// ── WEATHER ────────────────────────────
+const weatherInput = document.getElementById('weather-city-input');
+const weatherContent = document.getElementById('weather-content');
+
+document.getElementById('weather-search-btn').addEventListener('click', () => {
+  const city = weatherInput.value.trim();
+  if (city) loadWeather(city);
+});
+weatherInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { const city = weatherInput.value.trim(); if (city) loadWeather(city); }
+});
+document.getElementById('refresh-weather').addEventListener('click', () => {
+  if (lastWeatherCity) loadWeather(lastWeatherCity);
+});
+
+async function loadWeather(city) {
+  lastWeatherCity = city;
+  weatherContent.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Lade Wetter…</span></div>`;
   try {
-    const res = await fetch('/.netlify/functions/odds');
-    if (!res.ok) throw new Error('API Error');
+    const res = await fetch(`/.netlify/functions/weather?city=${encodeURIComponent(city)}`);
+    if (!res.ok) throw new Error('Not found');
     const data = await res.json();
-    renderBets(data);
-  } catch (err) {
-    list.innerHTML = `<div class="empty-state">⚠️ Quoten konnten nicht geladen werden.<br><small>Stelle sicher, dass die Netlify Function läuft und ein API-Key hinterlegt ist.</small></div>`;
+    renderWeather(data);
+  } catch {
+    weatherContent.innerHTML = `<div class="empty-state">⚠️ Stadt nicht gefunden oder API nicht verfügbar.<br><small>Stelle sicher, dass WEATHER_API_KEY in Netlify hinterlegt ist.</small></div>`;
   }
 }
 
-function renderBets(games) {
-  const list = document.getElementById('bets-list');
-  if (!games || games.length === 0) {
-    list.innerHTML = `<div class="empty-state">Keine aktuellen Spiele gefunden.</div>`;
-    return;
-  }
-  list.innerHTML = games.slice(0, 12).map(game => {
-    const odds = (game.bookmakers?.[0]?.markets?.[0]?.outcomes || []).slice(0, 3);
-    const time = new Date(game.commence_time).toLocaleString('de-DE', { weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
-    return `
-      <div class="bet-card">
-        <div class="bet-sport">${game.sport_title || game.sport_key}</div>
-        <div class="bet-title">${escHtml(game.home_team)} vs. ${escHtml(game.away_team)}</div>
-        <div class="bet-time">🕐 ${time}</div>
-        <div class="bet-odds">
-          ${odds.map(o => `
-            <button class="odd-btn" onclick="this.classList.toggle('selected')">
-              <span class="odd-label">${escHtml(o.name)}</span>
-              <span class="odd-value">${o.price.toFixed(2)}</span>
-            </button>
-          `).join('')}
-        </div>
+function renderWeather(d) {
+  const current = d.current;
+  const forecast = d.forecast?.forecastday || [];
+  const icon = `https:${current.condition.icon}`;
+
+  weatherContent.innerHTML = `
+    <div class="weather-current">
+      <div class="weather-city-name">${escHtml(d.location.name)}, ${escHtml(d.location.country)}</div>
+      <div class="weather-main">
+        <img src="${icon}" alt="${escHtml(current.condition.text)}" class="weather-icon-large" />
+        <div class="weather-temp">${Math.round(current.temp_c)}°C</div>
       </div>
-    `;
-  }).join('');
-}
+      <div class="weather-condition">${escHtml(current.condition.text)}</div>
+      <div class="weather-details">
+        <div class="weather-detail"><span>💧</span><span>${current.humidity}%</span><small>Luftfeuchtigkeit</small></div>
+        <div class="weather-detail"><span>💨</span><span>${Math.round(current.wind_kph)} km/h</span><small>Wind</small></div>
+        <div class="weather-detail"><span>🌡️</span><span>${Math.round(current.feelslike_c)}°C</span><small>Gefühlt</small></div>
+      </div>
+    </div>
 
-document.getElementById('refresh-bets').addEventListener('click', loadBets);
+    ${forecast.length > 0 ? `
+    <div class="weather-forecast-title">7-Tage-Vorschau</div>
+    <div class="weather-forecast">
+      ${forecast.map(day => {
+        const date = new Date(day.date);
+        const dayName = date.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+        return `
+          <div class="forecast-card">
+            <div class="forecast-day">${dayName}</div>
+            <img src="https:${day.day.condition.icon}" alt="${escHtml(day.day.condition.text)}" class="forecast-icon" />
+            <div class="forecast-temps">
+              <span class="forecast-high">${Math.round(day.day.maxtemp_c)}°</span>
+              <span class="forecast-low">${Math.round(day.day.mintemp_c)}°</span>
+            </div>
+            <div class="forecast-rain">🌧 ${day.day.daily_chance_of_rain}%</div>
+          </div>
+        `;
+      }).join('')}
+    </div>` : ''}
+  `;
+}
 
 // ── HELPERS ────────────────────────────
 function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
-
 function priorityLabel(p) {
   return { high: '🔴 Hoch', medium: '🟡 Mittel', low: '🟢 Niedrig' }[p] || p;
 }
-
 function formatDate(iso) {
   if (!iso) return '';
   const [y, m, d] = iso.split('-');

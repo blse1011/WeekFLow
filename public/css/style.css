@@ -365,67 +365,96 @@ input, textarea, select, button { font-family: inherit; }
   flex-shrink: 0;
 }
 
-/* ── BETS ────────────────────────────── */
-.bets-disclaimer {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  margin-bottom: 16px;
-  padding: 8px 12px;
-  background: var(--bg-hover);
-  border-radius: var(--radius-sm);
+/* ── WEATHER ─────────────────────────── */
+.weather-location-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
 }
-.bets-list { display: flex; flex-direction: column; gap: 10px; }
-.bet-card {
+.weather-location-bar input { flex: 1; }
+
+.weather-current {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 20px;
+  animation: slideIn 200ms ease;
+}
+.weather-city-name {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.weather-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.weather-icon-large { width: 64px; height: 64px; }
+.weather-temp {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.weather-condition {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+}
+.weather-details {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.weather-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.weather-detail span:nth-child(2) { font-weight: 600; font-size: 0.95rem; }
+.weather-detail small { font-size: 0.7rem; color: var(--text-muted); }
+
+.weather-forecast-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.weather-forecast {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  overflow-x: auto;
+}
+@media (max-width: 600px) {
+  .weather-forecast { grid-template-columns: repeat(7, minmax(80px, 1fr)); }
+}
+.forecast-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 10px 6px;
+  text-align: center;
   animation: slideIn 200ms ease;
 }
-.bet-sport {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--accent);
-  margin-bottom: 6px;
-}
-.bet-title {
-  font-weight: 500;
-  font-size: 0.95rem;
-  margin-bottom: 10px;
-}
-.bet-time {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-bottom: 10px;
-}
-.bet-odds {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-.odd-btn {
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 6px;
-  text-align: center;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-.odd-btn:hover {
-  background: var(--accent-light);
-  border-color: var(--accent);
-}
-.odd-btn.selected {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-.odd-label { font-size: 0.7rem; color: var(--text-muted); display: block; }
-.odd-btn.selected .odd-label { color: rgba(255,255,255,.7); }
-.odd-value { font-size: 0.95rem; font-weight: 600; }
+.forecast-day { font-size: 0.68rem; color: var(--text-muted); font-weight: 500; margin-bottom: 6px; }
+.forecast-icon { width: 36px; height: 36px; margin: 0 auto 4px; display: block; }
+.forecast-temps { display: flex; justify-content: center; gap: 4px; font-size: 0.8rem; margin-bottom: 4px; }
+.forecast-high { font-weight: 600; }
+.forecast-low { color: var(--text-muted); }
+.forecast-rain { font-size: 0.68rem; color: var(--text-muted); }
 
 /* ── MODAL ───────────────────────────── */
 .modal-backdrop {
