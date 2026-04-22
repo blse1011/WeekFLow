@@ -1,0 +1,13 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+# Alle Routen auf index.html weiterleiten (SPA)
+[[redirects]]
+  from = "/*"
+  to   = "/index.html"
+  status = 200
+
+# Netlify Identity aktivieren
+[template.environment]
+  ODDS_API_KEY = "DEIN_API_KEY_HIER"
