@@ -1,5 +1,7 @@
 // netlify/functions/tasks.js
-// Cloud-Sync via Netlify Blobs (eingebaut, keine npm dependency nötig)
+// Korrekte Implementierung nach offizieller Netlify Blobs Doku
+
+import { getStore } from "@netlify/blobs";
 
 function decodeJwt(token) {
   try {
@@ -9,54 +11,50 @@ function decodeJwt(token) {
   } catch { return null; }
 }
 
-exports.handler = async (event, context) => {
+export default async (req, context) => {
   // User-ID aus JWT holen
   let userId = context.clientContext?.user?.sub;
   if (!userId) {
-    const auth = event.headers['authorization'] || '';
+    const auth = req.headers.get('authorization') || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
     if (token) userId = decodeJwt(token)?.sub;
   }
 
   if (!userId) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Nicht eingeloggt' }) };
+    return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), { status: 401 });
   }
 
-  // Netlify Blobs aus der eingebauten Runtime laden (kein npm install nötig)
-  let getStore;
-  try {
-    ({ getStore } = require('@netlify/blobs'));
-  } catch {
-    return { statusCode: 500, body: JSON.stringify({ error: '@netlify/blobs nicht verfügbar' }) };
-  }
-
-  const store = getStore('weekflow-tasks');
+  const store = getStore("weekflow-tasks");
   const key = `tasks-${userId}`;
 
   // GET: Tasks laden
-  if (event.httpMethod === 'GET') {
+  if (req.method === 'GET') {
     try {
       const data = await store.get(key, { type: 'json' });
-      return {
-        statusCode: 200,
+      return new Response(JSON.stringify(data || []), {
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data || []),
-      };
+      });
     } catch {
-      return { statusCode: 200, body: '[]' };
+      return new Response('[]', { headers: { 'Content-Type': 'application/json' } });
     }
   }
 
   // POST: Tasks speichern
-  if (event.httpMethod === 'POST') {
+  if (req.method === 'POST') {
     try {
-      const tasks = JSON.parse(event.body || '[]');
+      const tasks = await req.json();
       await store.setJSON(key, tasks);
-      return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
     } catch (e) {
-      return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
+      return new Response(JSON.stringify({ error: e.message }), { status: 500 });
     }
   }
 
-  return { statusCode: 405, body: 'Method Not Allowed' };
+  return new Response('Method Not Allowed', { status: 405 });
+};
+
+export const config = {
+  path: "/.netlify/functions/tasks"
 };
