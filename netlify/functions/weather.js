@@ -16,8 +16,8 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Parameter "city" fehlt.' }) };
   }
 
-  // 7-Tage Forecast + aktuelles Wetter in einem Request
-  const url = `https://api.weatherapi.com/v1/forecast.json?key=${API_KEY}&q=${encodeURIComponent(city)}&days=7&lang=de`;
+  // 3-Tage Forecast + aktuelles Wetter in einem Request
+  const url = `https://api.weatherapi.com/v1/forecast.json?key=${API_KEY}&q=${encodeURIComponent(city)}&days=3&lang=de`;
 
   try {
     const response = await fetch(url);

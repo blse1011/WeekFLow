@@ -339,7 +339,7 @@ function renderWeather(d) {
     </div>
 
     ${forecast.length > 0 ? `
-    <div class="weather-forecast-title">7-Tage-Vorschau</div>
+    <div class="weather-forecast-title">3-Tage-Vorschau</div>
     <div class="weather-forecast">
       ${forecast.map(day => {
         const date = new Date(day.date);
