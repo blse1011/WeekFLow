@@ -7,6 +7,7 @@ let tasks = [];
 let currentUser = null;
 let activeFilter = 'all';
 let lastWeatherCity = '';
+let weekoffset = 0;
 
 const THEME_KEY = 'weekflow_theme';
 
@@ -69,6 +70,14 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (tab === 'weather' && lastWeatherCity) loadWeather(lastWeatherCity);
   });
 });
+document.getElementById('week-prev').addEventListener('click', () => {
+  weekOffset--;
+  renderWeek();
+});
+document.getElementById('week-next').addEventListener('click', () => {
+  weekOffset++;
+  renderWeek();
+});
 
 // ── CLOUD TASK SYNC (Netlify Function) ─
 async function getAuthHeader() {
@@ -110,9 +119,11 @@ async function saveTasksToCloud() {
 function renderWeek() {
   const grid = document.getElementById('week-grid');
   const today = new Date();
-  const dayOfWeek = today.getDay();
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - ((dayOfWeek + 6) % 7));
+  const baseDate = new Date(today);
+  baseDate.setDate(today.getDate() + weekOffset * 7);
+  const dayOfWeek = baseDate.getDay();
+  const monday = new Date(baseDate);
+  monday.setDate(baseDate.getDate() - ((dayOfWeek + 6) % 7));
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday);
@@ -129,9 +140,9 @@ function renderWeek() {
   grid.innerHTML = '';
 
   weekDays.forEach((date, i) => {
-    const isToday = date.toDateString() === today.toDateString();
+    const isToday = weekOffset === 0 && date.toDateString() === today.toDateString();
     const dayShort = shorts[i];
-    const dayTasks = tasks.filter(t => t.day === dayShort);
+    const dayTasks = tasks.filter(t => t.day === dayShort && !t.done);
 
     const col = document.createElement('div');
     col.className = `day-col${isToday ? ' today' : ''}`;
