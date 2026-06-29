@@ -7,7 +7,7 @@ let tasks = [];
 let currentUser = null;
 let activeFilter = 'all';
 let lastWeatherCity = '';
-let weekoffset = 0;
+let weekOffset = 0;
 
 const THEME_KEY = 'weekflow_theme';
 
