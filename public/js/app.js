@@ -142,7 +142,12 @@ function renderWeek() {
   weekDays.forEach((date, i) => {
     const isToday = weekOffset === 0 && date.toDateString() === today.toDateString();
     const dayShort = shorts[i];
-    const dayTasks = tasks.filter(t => t.day === dayShort && !t.done);
+    const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+    const dayTasks = tasks.filter(t => {
+      if (t.done) return false;
+      if (t.due) return t.due === dateStr;       // Hat Fälligkeitsdatum -> nur an diesem Tag zeigen
+      return t.day === dayShort;                  // Kein Datum -> nach Wochentag zeigen
+    });
 
     const col = document.createElement('div');
     col.className = `day-col${isToday ? ' today' : ''}`;
